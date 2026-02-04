@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>المحارب س: مغامرة المحيط الأحمر</title>
+    <style>
+        /* --- 1. التنسيقات العامة والخطوط --- */
+        @import url('https://fonts.googleapis.com/css2?family=Lalezar&family=Tajawal:wght@400;700&display=swap');
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background-color: #000;
+            font-family: 'Tajawal', sans-serif; color: white;
+            user-select: none; -webkit-user-select: none;
+        }
+
+        #game-container { width: 100%; height: 100%; position: relative; transition: transform 0.1s; }
+
+        /* تأثير الاهتزاز */
+        .shake-effect {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+            transform: translate3d(0, 0, 0);
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate3d(6px, 0, 0); }
+        }
+
+        .scene {
+            display: none; width: 100%; height: 100%; position: absolute;
+            top: 0; left: 0; flex-direction: column; justify-content: center;
+            align-items: center; background-size: cover; background-position: center;
+        }
+        .active { display: flex; }
+
+        .fire-border {
+            box-shadow: inset 0 0 40px #ff4500, inset 0 0 80px #ff0000;
+            animation: fire-pulse 2s infinite alternate;
+            border: 4px solid #ff4500;
+        }
+        @keyframes fire-pulse {
+            0% { box-shadow: inset 0 0 30px #ff4500; filter: brightness(1); }
+            100% { box-shadow: inset 0 0 80px #ff8c00; filter: brightness(1.2); }
+        }
+
+        video { width: 100%; height: 100%; object-fit: cover; }
+        img { max-width: 100%; max-height: 100%; }
+
+        .game-btn {
+            background: linear-gradient(145deg, #e60000, #ff8c00);
+            border: 3px solid #fff; padding: 15px 45px;
+            font-size: 1.6rem; color: white; border-radius: 50px;
+            cursor: pointer; font-family: 'Lalezar', cursive;
+            transition: 0.3s; z-index: 100; margin-top: 20px;
+        }
+
+        /* شريط الذخيرة الملون */
+        #ammo-bar {
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9); border: 3px solid #00ff00;
+            padding: 12px 35px; border-radius: 30px; font-family: 'Lalezar', cursive;
+            font-size: 1.6rem; z-index: 1000; display: none; color: #00ff00;
+            transition: all 0.5s ease;
+        }
+
+        .ammo-danger { animation: pulse-red 0.5s infinite alternate; }
+        @keyframes pulse-red {
+            from { box-shadow: 0 0 5px #ff0000; }
+            to { box-shadow: 0 0 20px #ff0000; }
+        }
+
+        .falling-item { position: absolute; cursor: pointer; z-index: 50; }
+        #info-popup {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 85%; max-height: 80%; border: 6px solid #ffd700;
+            border-radius: 20px; z-index: 2000; display: none; background: black;
+        }
+
+        .quiz-box { background: rgba(0, 0, 0, 0.9); padding: 35px; border-radius: 25px; border: 3px solid #00aaff; width: 85%; }
+        #fort-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: 320px; margin-top: 20px; }
+        .brick { aspect-ratio: 1; background-color: #900; border: 2px solid #f00; background-image: url('تنين.png'); background-size: 70%; background-position: center; background-repeat: no-repeat; }
+        
+        /* تحسين تنسيق الرسالة الختامية */
+        #typewriter { 
+            font-family: 'Tajawal', sans-serif; 
+            font-size: 2rem; 
+            text-align: center; 
+            line-height: 1.8; 
+            padding: 40px; 
+            direction: rtl; 
+            white-space: normal; 
+            max-width: 80%;
+        }
+        .highlight-hero { color: #ffd700; font-weight: bold; font-family: 'Lalezar'; font-size: 2.5rem; }
+
+    </style>
+</head>
+<body>
+
+    <audio id="bg-music" src="sound 1.mp3" loop></audio>
+    <audio id="typing-sound" src="sound 2.mp3"></audio>
+
+    <div id="game-container">
+        <div id="ammo-bar">ذخيرة المناعة المعلوماتية: <span id="score-val">0</span></div>
+
+        <div id="scene-main" class="scene active" style="background-image: url('واجهة.png');">
+            <button id="start-btn-overlay" style="position:absolute; top:0; left:0; width:100%; height:100%; background:transparent; border:none; cursor:pointer;" onclick="startGame()"></button>
+        </div>
+
+        <div id="scene-video" class="scene" style="background: black;">
+            <video id="main-video" playsinline></video>
+            <button class="game-btn" onclick="skipVideo()" style="position: absolute; bottom: 20px; right: 20px; font-size: 1rem;">تخطي</button>
+        </div>
+
+        <div id="scene-image" class="scene fire-border">
+            <img id="display-img" src="">
+            <button id="scene-img-btn" class="game-btn" style="display:none; position:absolute; bottom:40px;"></button>
+        </div>
+
+        <div id="scene-gameplay" class="scene fire-border" style="background: radial-gradient(circle, #2b0000, #000);">
+            <div id="game-area" style="width:100%; height:100%;"></div>
+            <img id="info-popup" src="">
+            <button id="next-level-btn" class="game-btn" style="position: absolute; bottom: 40px; display: none;" onclick="finishLevel()">الانتقال للمرحلة التالية</button>
+        </div>
+
+        <div id="scene-quiz" class="scene fire-border" style="background: #000b1a;">
+            <div class="quiz-box">
+                <div id="quiz-question" style="font-family:Lalezar; font-size:2rem; color:#00aaff; margin-bottom:20px; text-align:center;"></div>
+                <div id="quiz-options"></div>
+                <p id="quiz-feedback" style="color: #00ff00; font-weight:bold; height: 30px; text-align:center;"></p>
+            </div>
+        </div>
+
+        <div id="scene-boss" class="scene fire-border" style="background: #1a0000;">
+            <div style="color: #ffcc00; font-family: 'Lalezar'; font-size: 1.4rem; margin-bottom: 15px; text-align:center;">حان الوقت، جابه التنين وحطّم حصنه بما تملكه من ذخيرة المناعة المعلوماتية</div>
+            <div style="font-family:Lalezar; font-size:2rem; color:red;">الوقـت المتبقي: <span id="timer-val">120</span></div>
+            <div id="fort-grid"></div>
+        </div>
+
+        <div id="scene-lose" class="scene">
+            <video id="lose-video" src="lose.mp4" playsinline style="width:100%; height:80%;"></video>
+            <button class="game-btn" onclick="location.reload()">إعادة المحاولة 🔄</button>
+        </div>
+
+        <div id="scene-text-end" class="scene" style="background: #000;">
+            <div id="typewriter"></div>
+        </div>
+
+        <div id="scene-final" class="scene">
+            <video id="end-video" playsinline></video>
+            <button id="home-btn" class="game-btn" style="display:none; position:absolute; bottom:40px;" onclick="location.reload()">عودة إلى البداية 🏠</button>
+        </div>
+    </div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playEffect(type) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            if(type === 'pop') { osc.type = 'sine'; osc.frequency.setValueAtTime(600, audioCtx.currentTime); gain.gain.setValueAtTime(0.2, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime + 0.1); }
+            else if(type === 'boom') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(100, audioCtx.currentTime); gain.gain.setValueAtTime(0.3, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime + 0.2); }
+            else if(type === 'hit') { osc.type = 'square'; osc.frequency.setValueAtTime(150, audioCtx.currentTime); gain.gain.setValueAtTime(0.2, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime + 0.05); }
+        }
+
+        let score = 0;
+        let currentLevel = 0;
+        let spawnInterval;
+        let bossInterval;
+        let bossTimer = 120;
+        let currentVideoCallback = null;
+        let isPausedForInfo = false;
+
+        const assets = {
+            images: {
+                main: "واجهة.png", story: "قصة المحارب س.png",
+                intro1: "التعريف بالمرحلة الأولى - مرحلة الأسباب.png",
+                intro2: "التعريف بالمرحلة الثانية - مرحلة الوقاية.png",
+                intro3: "التعريف بالمرحلة الثالثة - مرحلة العلاج والقضاء على التنين.png",
+                l1Cards: ["الذخيرة المعلوماتية الأولى من المرحلة الأولى.png", "الذخيرة المعلوماتية الثانية من المرحلة الأولى.png", "الذخيرة المعلوماتية الثالثة من المرحلة الأولى.png"],
+                l2Cards: ["الذخيرة المعلوماتية الأولى من المرحلة الثانية.png", "الثانية.png", "الذخيرة المعلوماتية الثالثة من المرحلة الثانية.png"],
+                l3Cards: ["الذخيرة المعلوماتية الأولى من المرحلة الثالثة.png", "الذخيرة المعلوماتية الثانية من المرحلة الثالثة.png", "الذخيرة المعلوماتية الثالثة من المرحلة الثالثة.png"],
+                bossReveal: "حقيقة المحارب س.png"
+            }
+        };
+
+        const bgMusic = document.getElementById('bg-music');
+        const typingSound = document.getElementById('typing-sound');
+
+        function triggerShake() {
+            const container = document.getElementById('game-container');
+            container.classList.add('shake-effect');
+            setTimeout(() => container.classList.remove('shake-effect'), 400);
+        }
+
+        function updateScore(v) {
+            score += v; if(score < 0) score = 0;
+            const scoreEl = document.getElementById('score-val');
+            const bar = document.getElementById('ammo-bar');
+            scoreEl.innerText = score;
+            bar.classList.remove('ammo-danger');
+            if (score > 20) { bar.style.borderColor = "#00ff00"; bar.style.color = "#00ff00"; }
+            else if (score > 10) { bar.style.borderColor = "#ffff00"; bar.style.color = "#ffff00"; }
+            else { bar.style.borderColor = "#ff0000"; bar.style.color = "#ff0000"; bar.classList.add('ammo-danger'); }
+        }
+
+        function showScene(id) {
+            document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function startGame() {
+            audioCtx.resume();
+            bgMusic.volume = 0.15; bgMusic.play().catch(e => {});
+            playVideo("First.mp4", () => {
+                showScene('scene-image');
+                document.getElementById('display-img').src = assets.images.story;
+                const btn = document.getElementById('scene-img-btn');
+                btn.innerText = "المرحلة الأولى"; btn.style.display = 'none';
+                setTimeout(() => { btn.style.display = 'inline-block'; btn.onclick = () => goToLevel(1); }, 20000);
+            });
+        }
+
+        function playVideo(src, callback) {
+            showScene('scene-video');
+            const v = document.getElementById('main-video');
+            v.src = src; v.play();
+            currentVideoCallback = callback;
+            v.onended = () => { v.pause(); if(callback) callback(); };
+        }
+
+        function skipVideo() { const v = document.getElementById('main-video'); v.pause(); if(currentVideoCallback) currentVideoCallback(); }
+
+        function goToLevel(lvl) {
+            currentLevel = lvl;
+            document.getElementById('ammo-bar').style.display = 'block';
+            if(lvl >= 1 && lvl <= 3) setupActionLevel(lvl);
+            else if(lvl >= 4 && lvl <= 6) setupQuizLevel(lvl);
+            else if(lvl === 7) startBossLevel();
+        }
+
+        function setupActionLevel(lvl) {
+            playVideo(`level ${lvl}.mp4`, () => {
+                showScene('scene-image');
+                document.getElementById('display-img').src = assets.images[`intro${lvl}`];
+                document.getElementById('scene-img-btn').style.display = 'none';
+                setTimeout(() => runGameplay(lvl), 30000);
+            });
+        }
+
+        function runGameplay(lvl) {
+            showScene('scene-gameplay');
+            const area = document.getElementById('game-area');
+            area.innerHTML = '';
+            document.getElementById('next-level-btn').style.display = 'none';
+            let cardsPool = [...assets.images[`l${lvl}Cards`]];
+
+            spawnInterval = setInterval(() => {
+                if(isPausedForInfo) return;
+                let rand = Math.random();
+                let cardChance = (lvl === 1) ? 0.08 : 0.05;
+                if(rand < cardChance && cardsPool.length > 0) spawnObject('card', cardsPool.shift());
+                else if(rand < 0.15) spawnObject('bomb');
+                else spawnObject('wbc');
+            }, 900);
+            setTimeout(() => { document.getElementById('next-level-btn').style.display = 'inline-block'; }, 50000);
+        }
+
+        function spawnObject(type, imgSrc = null) {
+            const el = document.createElement('div');
+            el.className = 'falling-item';
+            el.style.left = Math.random() * (window.innerWidth - 70) + 'px';
+            el.style.top = '-80px';
+            if(type === 'wbc') el.innerHTML = '<span style="font-size:45px">⚪</span>';
+            else if(type === 'bomb') el.innerHTML = '<span style="font-size:45px">💣</span>';
+            else if(type === 'card') el.innerHTML = '<span style="font-size:55px">📜</span>';
+
+            let pos = -80;
+            let fallSpeed = 2 + Math.random() * 2;
+            let fallAnim = setInterval(() => {
+                if(!isPausedForInfo) { pos += fallSpeed; el.style.top = pos + 'px'; }
+                if(pos > window.innerHeight) { clearInterval(fallAnim); if(el.parentNode) el.remove(); }
+            }, 20);
+
+            el.onpointerdown = () => {
+                if(isPausedForInfo && type !== 'card') return;
+                clearInterval(fallAnim); el.remove();
+                if(type === 'wbc') { updateScore(1); playEffect('pop'); }
+                else if(type === 'bomb') { updateScore(-5); triggerShake(); playEffect('boom'); }
+                else if(type === 'card') { updateScore(10); playEffect('pop'); showCardPopup(imgSrc); }
+            };
+            document.getElementById('game-area').appendChild(el);
+        }
+
+        function showCardPopup(src) {
+            isPausedForInfo = true;
+            const popup = document.getElementById('info-popup');
+            popup.src = src; popup.style.display = 'block';
+            setTimeout(() => { popup.style.display = 'none'; isPausedForInfo = false; }, 10000);
+        }
+
+        function finishLevel() { clearInterval(spawnInterval); goToLevel(currentLevel + 1); }
+
+        function setupQuizLevel(lvl) {
+            showScene('scene-quiz');
+            const q = document.getElementById('quiz-question');
+            const o = document.getElementById('quiz-options');
+            const f = document.getElementById('quiz-feedback');
+            o.innerHTML = ''; f.innerText = '';
+            if(lvl === 4) { q.innerText = "يذكرني المحيط الأحمر بـ:"; createOpt(o, "الدم", true); createOpt(o, "المحيط الأطلسي", false); createOpt(o, "المحيط الهادي", false); }
+            else if(lvl === 5) { q.innerText = "يذكرني التنين الذي هاجم المحيط الأحمر بـ:"; createOpt(o, "سرطان الدم", false); createOpt(o, "اللوكيميا", false); createOpt(o, "كلاهما صحيح", true); }
+            else if(lvl === 6) {
+                q.innerText = "ما هي هوية المحارب س الحقيقية؟";
+                let inp = document.createElement('input'); inp.style.cssText = "width:80%; padding:15px; font-size:1.2rem; border-radius:10px; margin-bottom:20px; text-align:center; display:block; margin: 0 auto 20px;";
+                let b = document.createElement('button'); b.className = "game-btn"; b.innerText = "تحقق من الإجابة"; b.style.display="block"; b.style.margin="0 auto";
+                b.onclick = () => {
+                    if(["كريات الدم البيضاء", "الجهاز المناعي", "خلايا الدم البيضاء"].includes(inp.value.trim())) { playEffect('pop'); f.innerText = "أحسنت!"; setTimeout(() => goToLevel(7), 1500); }
+                    else { playEffect('boom'); f.innerText = "حاول مرة أخرى يا بطل"; }
+                };
+                o.append(inp, b);
+            }
+        }
+
+        function createOpt(cont, txt, corr) {
+            let b = document.createElement('button'); b.className = "game-btn"; b.style.width = "100%"; b.style.margin = "10px 0"; b.innerText = txt;
+            b.onclick = () => { if(corr) { playEffect('pop'); document.getElementById('quiz-feedback').innerText = "رائع! إجابة صحيحة"; setTimeout(() => goToLevel(currentLevel+1), 1000); } else { playEffect('boom'); document.getElementById('quiz-feedback').innerText = "فكر مجدداً..."; updateScore(-2); } };
+            cont.appendChild(b);
+        }
+
+        function startBossLevel() {
+            showScene('scene-boss');
+            const grid = document.getElementById('fort-grid');
+            grid.innerHTML = '';
+            for(let i=0; i<25; i++) {
+                let b = document.createElement('div'); b.className = 'brick'; b.dataset.hp = 3;
+                b.onclick = () => {
+                    if(score <= 0) { loseGame(); return; }
+                    updateScore(-1); b.dataset.hp--; b.style.opacity = b.dataset.hp / 3;
+                    triggerShake(); playEffect('hit');
+                    if(b.dataset.hp <= 0) { b.style.visibility = 'hidden'; checkBossWin(); }
+                };
+                grid.appendChild(b);
+            }
+            bossInterval = setInterval(() => { bossTimer--; document.getElementById('timer-val').innerText = bossTimer; if(bossTimer <= 0) loseGame(); }, 1000);
+        }
+
+        function checkBossWin() { if(document.querySelectorAll('.brick[style*="hidden"]').length === 25) { clearInterval(bossInterval); winGame(); } }
+
+        function winGame() {
+            playVideo('win.mp4', () => {
+                showScene('scene-image');
+                document.getElementById('display-img').src = assets.images.bossReveal;
+                document.getElementById('scene-img-btn').style.display = 'none';
+                setTimeout(() => startTypingSequence(), 30000);
+            });
+        }
+
+        // --- تعديل وظيفة الكتابة لربط الحروف العربية بشكل صحيح ---
+        function startTypingSequence() {
+            showScene('scene-text-end');
+            const el = document.getElementById('typewriter');
+            el.innerText = "";
+            const msg = "من القلب إلى أطفال العالم: عِشتم أصحاء، متفائلين، آمنين";
+            let i = 0;
+            typingSound.currentTime = 0;
+            typingSound.play();
+            typingSound.loop = true;
+
+            let intv = setInterval(() => {
+                // بدلاً من إضافة حرف واحد، نأخذ جزءاً متزايداً من النص لضمان الترابط
+                el.innerText = msg.substring(0, i); 
+                i++;
+                if(i > msg.length) {
+                    clearInterval(intv);
+                    setTimeout(replaceFinalWord, 1000);
+                }
+            }, 100);
+        }
+
+        function replaceFinalWord() {
+            const el = document.getElementById('typewriter');
+            // استبدال أطفال بـ أبطال مع الحفاظ على التنسيق المترابط
+            el.innerHTML = el.innerText.replace("أطفال", "<span class='highlight-hero'>أبطال</span>");
+            typingSound.pause();
+            setTimeout(() => {
+                el.style.transition = "opacity 3s"; el.style.opacity = 0;
+                setTimeout(() => {
+                    showScene('scene-final');
+                    const v = document.getElementById('end-video');
+                    v.src = "End.mp4"; v.play();
+                    v.onended = () => { v.pause(); document.getElementById('home-btn').style.display = 'inline-block'; };
+                }, 3000);
+            }, 10000);
+        }
+    </script>
+</body>
+</html>
